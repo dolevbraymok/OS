@@ -57,7 +57,17 @@ address_t translate_address(address_t addr)
 
 
 #endif
-
+/**
+ * a Class for the object thread
+ *
+ * Detailed description of the function, which can span multiple lines.
+ *
+ * @param remaining_sleeping_time remaining sleeping time in quantums of the thread if <= 0 the the thread isnt sleeping
+ * @param current_quantum_usec the number of quantum the thread has ran for so far
+ * @param tid the id of the thread
+ * @param stack the stack of the thread
+ * @param env the environment of the thread
+ */
 class Thread {
 
 public:
@@ -82,10 +92,23 @@ public:
         sigemptyset(&env->__saved_mask);
     }
 };
-
+/**
+ * Global variables for the library
+ * @param running_thread a pointer to the current running thread
+ * @param passed_quantum_usec How many quantums passed since the library was initialized
+ * @param quantum_value_usecs length of quantum in microseconds
+ * @param ready_threads a list of the ready threads 
+ * @param sleeping_threads a set of the sleeping threads
+ * @param tid_to_threads a map of the id of threads as keys and the thread themselfs as values
+ * @param available_threads a set of all the integer that are free to give as id for a thread
+ * @param blocked_threads a set of all the blocked threads presented as their ids
+ * @param timer itimerval to manage the quantums
+ * @param sa a sigaction object 
+ * @param sig_set a sig_set object
+ */
 Thread* running_thread;
-int passed_quantum_usec; // How many quantums passed since the library was initialized
-int quantum_value_usecs; // length of quantum in microseconds
+int passed_quantum_usec;
+int quantum_value_usecs;
 std::list<Thread*> ready_threads;
 std::set<Thread*> sleeping_threads;
 std::map<int, Thread*> tid_to_threads;
@@ -106,7 +129,9 @@ int get_min_id_available();
 void handle_switch_threads();
 
 void terminate_thread(int);
-
+/**
+ * realese all allocated memory of all the threads
+ */
 void delete_threads() {
     for (auto curr : tid_to_threads) {
         delete curr.second->stack;
@@ -114,7 +139,11 @@ void delete_threads() {
     }
 }
 
-
+/**
+ * function get action to block or unblock the thread and do so, if fails realese all memory and exit program
+ *
+ * @param action an integer of SIG_UNBLOCK SIG_BLOCK values
+ */
 void handle_block_unblock(int action) {
     if (sigprocmask(action, &sig_set, nullptr) == -1) {
         std::cerr << "system error: sigprocmask has failed\n";
@@ -123,13 +152,19 @@ void handle_block_unblock(int action) {
     }
 }
 
-
+/**
+ * function initialize available_set by inserting all integers from 1 to  MAX_THREAD_NUM to it
+ */
 void initialize_available_set() {
     for(int i = 1; i < MAX_THREAD_NUM; i++) {
         available_threads.insert(i);
     }
 }
-
+/**
+ * function set the timer and put its handler as round robin if fail in any part of the function terminate the program
+ *
+ * @param action an integer of SIG_UNBLOCK SIG_BLOCK values
+ */
 void set_timer() {
     sa.sa_handler = &round_robin_handler;
     if (sigaction(SIGVTALRM, &sa, NULL) == -1) {
@@ -147,7 +182,11 @@ void set_timer() {
         exit(1);
     }
 }
-
+/**
+ * function out put the minimal id that doesnt represents a thread
+ *
+ * @return an integer represents the id
+ */
 int get_min_id_available() {
     if (available_threads.empty())
         return -1;
@@ -215,7 +254,11 @@ int uthread_spawn(thread_entry_point entry_point) {
     return id;
 }
 
-
+/**
+ * Implementation of round robin scheduler that switch from the running thread to the next thread depends on the action
+ *
+ * @param action an int {SLEEP, BLOCK, TERMINATE} or else that represents the reason for the switch (else for quantum over)
+ */
 void round_robin_handler(int action) {
     int res = sigsetjmp(running_thread->env, 1);
     if (res == 0) {
@@ -244,7 +287,9 @@ void round_robin_handler(int action) {
         }
     }
 }
-
+/**
+ * Reduce the sleeping time of all sleeping thread by one and wake every thread that reach 0   if thread unblock also put it in ready threads
+ */
 void reduce_sleeping_time() {
     if (sleeping_threads.empty())
         return;
@@ -310,7 +355,11 @@ int uthread_terminate(int tid) {
     return 0;
 }
 
-
+/**
+ * get an id of a thread and realese all allocated memory and remove him from all global variables
+ *
+ * @param tid the id of the thread we terminate
+ */
 void terminate_thread(int tid) {
     // A function that gets a tid of a thread (not the running thread) and terminates it.
     auto thread = tid_to_threads[tid];
@@ -322,7 +371,9 @@ void terminate_thread(int tid) {
     delete thread->stack;
     delete thread;
 }
-
+/**
+ * a helper function for round robin  for the switch to the next thread in line
+ */
 void handle_switch_threads() {
     running_thread = ready_threads.front();
     running_thread->current_quantum_usec++;
